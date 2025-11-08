@@ -1,20 +1,25 @@
 from flask import Flask, render_template, request, redirect, session
-import json, os
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = "supersecret"  # needed for sessions
+app.secret_key = "supersecret"
 
-# --- Load users from file ---
-def load_users():
-    if not os.path.exists("users.json"):
-        return {}
-    with open("users.json", "r") as f:
-        return json.load(f)
+# --- SQLite Database Setup ---
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///users.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# --- Save users to file ---
-def save_users(users):
-    with open("users.json", "w") as f:
-        json.dump(users, f)
+db = SQLAlchemy(app)
+
+# --- User Model ---
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+
+# Create tables if not exists
+with app.app_context():
+    db.create_all()
 
 @app.route("/")
 def home():
@@ -25,16 +30,18 @@ def home():
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
-        name = request.form["name"]
+        username = request.form["name"]
         password = request.form["password"]
 
-        users = load_users()
-
-        if name in users:
+        existing_user = User.query.filter_by(username=username).first()
+        if existing_user:
             return "User already exists. Try logging in."
 
-        users[name] = password
-        save_users(users)
+        hashed_password = generate_password_hash(password)
+
+        new_user = User(username=username, password=hashed_password)
+        db.session.add(new_user)
+        db.session.commit()
 
         return redirect("/login")
 
@@ -43,18 +50,18 @@ def signup():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        name = request.form["name"]
+        username = request.form["name"]
         password = request.form["password"]
 
-        users = load_users()
+        user = User.query.filter_by(username=username).first()
 
-        if name not in users:
+        if not user:
             return "User not found. Please sign up first."
 
-        if users[name] != password:
+        if not check_password_hash(user.password, password):
             return "Wrong password."
 
-        session["username"] = name
+        session["username"] = username
         return redirect("/")
 
     return render_template("login.html")
