@@ -1,5 +1,8 @@
-A website for blogger with cooking talent to add their recipes in this website
-Bloggers can see other recipes
+Cooking Recipe website allowing users
+- To add recipe
+- To remove recipe
+- To see other recipes
+  
 
 
-_ login section : user can sign up for an account if they are new. They can signin if they are existing ones
+
